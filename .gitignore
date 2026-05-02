@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+*.zip
+build/
+.terraform/
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/.terraform.lock.hcl
+api_keys.py
+.DS_Store
