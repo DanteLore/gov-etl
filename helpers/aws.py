@@ -69,6 +69,11 @@ def add_glue_partition_y(year, table, database, results_bucket):
     _execute_athena_command(sql, database, results_bucket)
 
 
+def add_glue_partition_en(grid_e, grid_n, table, database, results_bucket):
+    sql = f"ALTER TABLE {table} ADD IF NOT EXISTS PARTITION (grid_e='{grid_e}', grid_n='{grid_n}')"
+    _execute_athena_command(sql, database, results_bucket)
+
+
 def _execute_athena_command(sql, database, results_bucket, wait_seconds=10):
     athena = boto3.client('athena')
     print(f"Executing: {sql}")

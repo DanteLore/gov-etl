@@ -56,6 +56,29 @@ for the current year to pick up new transactions.
 
 ---
 
+### 3. OS Open UPRN (`os_open_uprn/`)
+
+Coordinates for every addressable location in Great Britain, each identified by a
+Unique Property Reference Number (UPRN). ~40 million records.
+
+**Source:** https://osdatahub.os.uk/downloads/open/OpenUPRN
+
+**S3 path:** `s3://dantelore.data.incoming/os_open_uprn/uprn/grid_e={e}/grid_n={n}/`
+
+**Glue table:** `incoming.os_open_uprn_uprn`
+
+Partitioned by 100km OSGB National Grid tile: `grid_e = floor(X_COORDINATE / 100000)`,
+`grid_n = floor(Y_COORDINATE / 100000)`. Covers roughly grid_e 0-6, grid_n 0-12.
+
+**Load (overwrites existing data with current release):**
+```bash
+python os_open_uprn/os_open_uprn_load.py
+```
+
+**When to re-run:** OS publish updated data every six weeks.
+
+---
+
 ## Setup
 
 ```bash
