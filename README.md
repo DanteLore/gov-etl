@@ -130,11 +130,40 @@ python os_open_uprn/os_open_uprn_load.py
 
 ---
 
+### 6. VOA 2026 Compiled Rating List (`voa_rating_list/`)
+
+All non-domestic (commercial) rated properties in England and Wales from the 2026
+Valuation Office Agency compiled rating list. ~2.4 million entries covering shops,
+offices, warehouses, factories, pubs and all other business premises.
+
+Useful as a count of commercial addresses within an area — subtract from total UPRN
+count to estimate the residential address count.
+
+**Source:** https://voaratinglists.blob.core.windows.net/html/rlidata.htm
+(Free to download; usage subject to VOA terms and conditions)
+
+**S3 path:** `s3://dantelore.data.incoming/voa_rating_list/entries/postcode_area={area}/`
+
+**Glue table:** `incoming.voa_rating_list_entries`
+
+Partitioned by postcode area (e.g. `rg`, `sw`).
+
+**Load:**
+```bash
+python voa_rating_list/voa_rating_list_load.py
+```
+
+**When to re-run:** The VOA publish change updates twice weekly. The baseline epoch
+used here is `0001` (2026 list) — check the download portal for newer epochs and update
+`DOWNLOAD_URL` in the loader accordingly.
+
+---
+
 ## Setup
 
 ```bash
 python -m venv .venv
-source .venv/Scripts/activate   # Windows
+.venv\Scripts\activate   # Windows
 pip install -r requirements.txt
 ```
 
