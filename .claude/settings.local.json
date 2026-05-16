@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "WebFetch(domain:storage.googleapis.com)"
+      "WebFetch(domain:storage.googleapis.com)",
+      "Bash(find c:/Development -maxdepth 2 -type f -name \"*.md\" 2>/dev/null | head -20)",
+      "Read(//c//**)"
     ]
   }
 }
