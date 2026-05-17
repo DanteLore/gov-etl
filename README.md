@@ -265,6 +265,37 @@ used here is `0001` (2026 list) — check the download portal for newer epochs a
 
 ---
 
+### 7. ONS Inflation (`ons_inflation/`)
+
+Monthly CPI, CPIH and RPI time series from the ONS MM23 dataset. 934 monthly
+observations from June 1948 (RPI) and January 1988 (CPI/CPIH) to present.
+Useful for deflating house prices or other monetary values to real terms.
+
+**Source:** ONS MM23 dataset via `www.ons.gov.uk` time series API (no authentication required)
+
+**S3 path:** `s3://dantelore.data.incoming/ons_inflation/inflation/inflation.parquet`
+
+**Glue table:** `incoming.ons_inflation_inflation`
+
+| Field | Type | Description |
+|---|---|---|
+| `year` | int | Year |
+| `month` | int | Month number (1–12) |
+| `cpi_index` | double | CPI index value (2015=100), from Jan 1988 |
+| `cpi_rate` | double | CPI 12-month rate % (year-on-year), from Jan 1989 |
+| `cpih_index` | double | CPIH index value (2015=100), from Jan 1989 |
+| `cpih_rate` | double | CPIH 12-month rate % (year-on-year), from Jan 1988 |
+| `rpi_rate` | double | RPI 12-month rate % (year-on-year), from Jun 1948 |
+
+**Load (replaces the single parquet file with all series up to the latest published month):**
+```bash
+python ons_inflation/ons_inflation_load.py
+```
+
+**When to re-run:** ONS publish updated inflation figures monthly (typically around the 3rd Wednesday).
+
+---
+
 ## Setup
 
 ```bash
