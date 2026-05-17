@@ -145,7 +145,45 @@ Re-run when a new vintage is published on the Open Geography Portal.
 
 ---
 
-### 4. OS Code Point Open (`os_code_point_open/`)
+### 4. ONS Counties and Unitary Authorities Boundaries (`ons_ctyua_boundaries/`)
+
+Polygon boundaries for 205 Counties and Unitary Authorities (CTYUAs) covering England,
+Wales and Scotland. Uses the Ultra Generalised Clipped Boundaries (UGCB) April 2019 vintage
+— area codes are stable and match current ONS codes. Useful for aggregating data at
+county/regional level (e.g. West Berkshire `E06000037`).
+
+**Source:** ONS Open Geography Portal — `CTYUA_Apr_2019_UGCB_Great_Britain_2022` ArcGIS FeatureServer
+
+**S3 path:** `s3://dantelore.data.incoming/ons_ctyua_boundaries/ctyua/ctyua_2025.parquet`
+
+**Glue table:** `incoming.ons_ctyua_boundaries_ctyua`
+
+| Field | Type | Description |
+|---|---|---|
+| `ctyua25cd` | string | Stable ONS area code (primary key, e.g. `E06000037`) |
+| `ctyua25nm` | string | Area name in English (e.g. `West Berkshire`) |
+| `ctyua25nmw` | string | Area name in Welsh (Wales only, null elsewhere) |
+| `geometry_wgs84_wkt` | string | Polygon/MultiPolygon in WGS84 (EPSG:4326) as WKT |
+| `geometry_osgb_wkt` | string | Polygon/MultiPolygon in British National Grid (EPSG:27700) as WKT |
+| `centre_e` | int | Centroid easting (OSGB metres) |
+| `centre_n` | int | Centroid northing (OSGB metres) |
+| `bbox_min_e` | int | Bounding rectangle min easting (OSGB metres) |
+| `bbox_min_n` | int | Bounding rectangle min northing (OSGB metres) |
+| `bbox_max_e` | int | Bounding rectangle max easting (OSGB metres) |
+| `bbox_max_n` | int | Bounding rectangle max northing (OSGB metres) |
+
+**Load:**
+```bash
+python ons_ctyua_boundaries/ons_ctyua_boundaries_load.py
+```
+
+**When to re-run:** CTYUA boundaries change only when local government reorganisation occurs.
+Re-run when the ONS publishes a newer UGCB vintage on the Open Geography Portal, updating
+`ARCGIS_URL` in the loader to point to the new service.
+
+---
+
+### 5. OS Code Point Open (`os_code_point_open/`)
 
 Coordinates and administrative codes for every postcode in Great Britain (~1.8 million postcodes),
 partitioned by postcode area (e.g. `RG`, `SW`). Useful for joining house price or traffic data
@@ -180,7 +218,7 @@ python os_code_point_open/os_code_point_open_load.py
 
 ---
 
-### 5. OS Open UPRN (`os_open_uprn/`)
+### 6. OS Open UPRN (`os_open_uprn/`)
 
 Coordinates for every addressable location in Great Britain, each identified by a
 Unique Property Reference Number (UPRN). ~40 million records.
@@ -210,7 +248,7 @@ python os_open_uprn/os_open_uprn_load.py
 
 ---
 
-### 6. VOA 2026 Compiled Rating List (`voa_rating_list/`)
+### 7. VOA 2026 Compiled Rating List (`voa_rating_list/`)
 
 All non-domestic (commercial) rated properties in England and Wales from the 2026
 Valuation Office Agency compiled rating list. ~2.4 million entries covering shops,
@@ -265,7 +303,7 @@ used here is `0001` (2026 list) — check the download portal for newer epochs a
 
 ---
 
-### 7. ONS Inflation (`ons_inflation/`)
+### 8. ONS Inflation (`ons_inflation/`)
 
 Monthly CPI, CPIH and RPI time series from the ONS MM23 dataset. 934 monthly
 observations from June 1948 (RPI) and January 1988 (CPI/CPIH) to present.
