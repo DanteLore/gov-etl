@@ -16,6 +16,40 @@ Annual Average Daily Flow data from the Department for Transport.
 
 **Glue table:** `incoming.traffic_census_aadf`
 
+| Field | Type | Description |
+|---|---|---|
+| `count_point_id` | int | Unique ID for the traffic count point |
+| `direction_of_travel` | string | Direction of flow (e.g. `N`, `S`, `E`, `W`, `Combined`) |
+| `region_id` | int | DfT region identifier |
+| `region_name` | string | Region name (e.g. `South East`) |
+| `local_authority_id` | int | Local authority identifier |
+| `local_authority_name` | string | Local authority name |
+| `road_name` | string | Road identifier (e.g. `A34`) |
+| `road_category` | string | Road category code |
+| `road_type` | string | `Major` or `Minor` |
+| `start_junction_road_name` | string | Road name at start junction |
+| `end_junction_road_name` | string | Road name at end junction |
+| `easting` | int | OSGB easting of count point (metres) |
+| `northing` | int | OSGB northing of count point (metres) |
+| `latitude` | double | WGS84 latitude |
+| `longitude` | double | WGS84 longitude |
+| `link_length_km` | double | Length of the counted road link (km) |
+| `link_length_miles` | double | Length of the counted road link (miles) |
+| `pedal_cycles` | int | AADF count — pedal cycles |
+| `two_wheeled_motor_vehicles` | int | AADF count — motorcycles/mopeds |
+| `cars_and_taxis` | int | AADF count — cars and taxis |
+| `buses_and_coaches` | int | AADF count — buses and coaches |
+| `lgvs` | int | AADF count — light goods vehicles |
+| `hgvs_2_rigid_axle` | int | AADF count — HGVs, 2-axle rigid |
+| `hgvs_3_rigid_axle` | int | AADF count — HGVs, 3-axle rigid |
+| `hgvs_4_or_more_rigid_axle` | int | AADF count — HGVs, 4+ axle rigid |
+| `hgvs_3_or_4_articulated_axle` | int | AADF count — HGVs, 3–4 axle articulated |
+| `hgvs_5_articulated_axle` | int | AADF count — HGVs, 5-axle articulated |
+| `hgvs_6_articulated_axle` | int | AADF count — HGVs, 6-axle articulated |
+| `all_hgvs` | int | AADF count — all HGVs combined |
+| `all_motor_vehicles` | int | AADF count — all motor vehicles combined |
+| `year` | string | **Partition key** — census year (e.g. `2023`) |
+
 **Load all years:**
 ```bash
 python traffic_census/traffic_census_bulk_load.py
@@ -40,6 +74,26 @@ Every residential property sale in England & Wales registered with HMLR since 19
 **S3 path:** `s3://dantelore.data.incoming/house_prices/ppd/year={year}/`
 
 **Glue table:** `incoming.house_prices_ppd`
+
+| Field | Type | Description |
+|---|---|---|
+| `transaction_id` | string | Unique transaction identifier |
+| `price` | bigint | Sale price in £ |
+| `date_of_transfer` | string | Date of sale (YYYY-MM-DD HH:MM) |
+| `postcode` | string | Property postcode |
+| `property_type` | string | `D` detached, `S` semi-detached, `T` terraced, `F` flat, `O` other |
+| `old_new` | string | `Y` newly built, `N` established residential |
+| `duration` | string | `F` freehold, `L` leasehold |
+| `paon` | string | Primary addressable object name (house number or name) |
+| `saon` | string | Secondary addressable object name (flat/unit within building) |
+| `street` | string | Street name |
+| `locality` | string | Locality |
+| `town_city` | string | Town or city |
+| `district` | string | District |
+| `county` | string | County |
+| `ppd_category_type` | string | `A` standard, `B` additional (non-standard/bulk transfers) |
+| `record_status` | string | `A` addition, `C` change, `D` delete |
+| `year` | string | **Partition key** — year of transfer (e.g. `2023`) |
 
 **Load 1995 to present:**
 ```bash
@@ -68,13 +122,18 @@ filtering and joining against other datasets (e.g. house prices, traffic census)
 
 **Glue table:** `incoming.ons_bua_boundaries_bua`
 
-Key columns:
-- `bua24cd` — stable ONS area code (primary key)
-- `bua24nm` — area name
-- `geometry_wgs84_wkt` — polygon in WGS84 (EPSG:4326)
-- `geometry_osgb_wkt` — polygon in British National Grid (EPSG:27700)
-- `centre_e` / `centre_n` — OSGB centroid (metres)
-- `bbox_min_e` / `bbox_min_n` / `bbox_max_e` / `bbox_max_n` — OSGB bounding rectangle (metres)
+| Field | Type | Description |
+|---|---|---|
+| `bua24cd` | string | Stable ONS area code (primary key, e.g. `E63012319`) |
+| `bua24nm` | string | Area name (e.g. `Newbury`) |
+| `geometry_wgs84_wkt` | string | Polygon/MultiPolygon in WGS84 (EPSG:4326, lng/lat) as WKT |
+| `geometry_osgb_wkt` | string | Polygon/MultiPolygon in British National Grid (EPSG:27700, metres) as WKT |
+| `centre_e` | int | Centroid easting (OSGB metres) |
+| `centre_n` | int | Centroid northing (OSGB metres) |
+| `bbox_min_e` | int | Bounding rectangle min easting (OSGB metres) |
+| `bbox_min_n` | int | Bounding rectangle min northing (OSGB metres) |
+| `bbox_max_e` | int | Bounding rectangle max easting (OSGB metres) |
+| `bbox_max_n` | int | Bounding rectangle max northing (OSGB metres) |
 
 **Load (replaces the single parquet file with the full current dataset):**
 ```bash
@@ -98,6 +157,20 @@ to geographic areas via postcode.
 
 **Glue table:** `incoming.os_code_point_open_codepo`
 
+| Field | Type | Description |
+|---|---|---|
+| `postcode` | string | Full postcode (e.g. `RG14 5RU`) |
+| `positional_quality_indicator` | int | Accuracy of the coordinates (1 = best, 9 = worst) |
+| `eastings` | int | OSGB easting of postcode centroid (metres) |
+| `northings` | int | OSGB northing of postcode centroid (metres) |
+| `country_code` | string | Country code (e.g. `E92000001` for England) |
+| `nhs_regional_ha_code` | string | NHS Regional Health Authority code |
+| `nhs_ha_code` | string | NHS Health Authority code |
+| `admin_county_code` | string | Administrative county code |
+| `admin_district_code` | string | Administrative district code |
+| `admin_ward_code` | string | Administrative ward code |
+| `postcode_area` | string | **Partition key** — leading letters of postcode, lowercase (e.g. `rg`) |
+
 **Load (overwrites existing data with current release):**
 ```bash
 python os_code_point_open/os_code_point_open_load.py
@@ -118,8 +191,15 @@ Unique Property Reference Number (UPRN). ~40 million records.
 
 **Glue table:** `incoming.os_open_uprn_uprn`
 
-Partitioned by 100km OSGB National Grid tile: `grid_e = floor(X_COORDINATE / 100000)`,
-`grid_n = floor(Y_COORDINATE / 100000)`. Covers roughly grid_e 0-6, grid_n 0-12.
+| Field | Type | Description |
+|---|---|---|
+| `uprn` | bigint | Unique Property Reference Number |
+| `x_coordinate` | double | OSGB easting (metres) |
+| `y_coordinate` | double | OSGB northing (metres) |
+| `latitude` | double | WGS84 latitude |
+| `longitude` | double | WGS84 longitude |
+| `grid_e` | int | **Partition key** — `floor(x_coordinate / 100000)`, 100km easting tile |
+| `grid_n` | int | **Partition key** — `floor(y_coordinate / 100000)`, 100km northing tile |
 
 **Load (overwrites existing data with current release):**
 ```bash
@@ -146,7 +226,33 @@ count to estimate the residential address count.
 
 **Glue table:** `incoming.voa_rating_list_entries`
 
-Partitioned by postcode area (e.g. `rg`, `sw`).
+| Field | Type | Description |
+|---|---|---|
+| `uarn` | string | Unique Address Reference Number — VOA's property identifier (alphanumeric) |
+| `ba_code` | string | Billing authority (local council) code |
+| `ndr_community_code` | string | NDR community code |
+| `desc_code` | string | Property type code (e.g. `CS` = shop, `CO` = offices, `IF` = factory) |
+| `desc_text` | string | Property type description (e.g. `SHOP AND PREMISES`) |
+| `assessment_reference` | bigint | Internal VOA assessment reference |
+| `full_address` | string | Full address as a single concatenated string |
+| `number_or_name` | string | Property number or name |
+| `street` | string | Street name |
+| `town` | string | Town |
+| `postal_district` | string | Postal district |
+| `county` | string | County |
+| `postcode` | string | Full postcode (e.g. `RG14 5RU`) |
+| `effective_date` | string | Date the entry became effective (DD-MON-YYYY) |
+| `rateable_value` | int | Rateable value in £ |
+| `appeal_settlement_code` | string | Appeal status code |
+| `ba_reference` | string | Billing authority's own reference for this property |
+| `list_alteration_date` | string | Date the list entry was last altered (DD-MON-YYYY) |
+| `scat_code` | string | Special Category code — more granular classification than `desc_code` |
+| `sub_street_1` | string | Sub-street address level 1 (e.g. building name) |
+| `sub_street_2` | string | Sub-street address level 2 (e.g. floor) |
+| `sub_street_3` | string | Sub-street address level 3 (e.g. unit) |
+| `case_number` | bigint | Appeal case number if applicable |
+| `current_from_date` | string | Date the current rateable value took effect (DD-MON-YYYY) |
+| `postcode_area` | string | **Partition key** — leading letters of postcode, lowercase (e.g. `rg`) |
 
 **Load:**
 ```bash
