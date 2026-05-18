@@ -183,7 +183,129 @@ Re-run when the ONS publishes a newer UGCB vintage on the Open Geography Portal,
 
 ---
 
-### 5. OS Code Point Open (`os_code_point_open/`)
+### 5. ONS MSOA Boundaries 2021 (`ons_msoa_boundaries/`)
+
+Polygon boundaries for all 7,264 Middle Layer Super Output Areas (MSOAs) in England and
+Wales, 2021 vintage (Super Generalised Clipped Boundaries). MSOAs are the standard ONS
+small-area geography — ~7,500 people each. Includes Rural-Urban Classification.
+
+**Source:** ONS Open Geography Portal — `MSOA_2021_EW_BSC_V3_RUC` ArcGIS FeatureServer
+
+**S3 path:** `s3://dantelore.data.incoming/ons_msoa_boundaries/msoa/msoa_2021.parquet`
+
+**Glue table:** `incoming.ons_msoa_boundaries_msoa`
+
+| Field | Type | Description |
+|---|---|---|
+| `msoa21cd` | string | Stable ONS area code (primary key, e.g. `E02003552`) |
+| `msoa21nm` | string | Area name in English (e.g. `Newbury 001`) |
+| `msoa21nmw` | string | Area name in Welsh (Wales only, null elsewhere) |
+| `ruc21cd` | string | Rural-Urban Classification code (e.g. `D1`) |
+| `ruc21nm` | string | Rural-Urban Classification description |
+| `geometry_wgs84_wkt` | string | Polygon in WGS84 (EPSG:4326) as WKT |
+| `geometry_osgb_wkt` | string | Polygon in British National Grid (EPSG:27700) as WKT |
+| `centre_e` | int | Centroid easting (OSGB metres) |
+| `centre_n` | int | Centroid northing (OSGB metres) |
+| `bbox_min_e` | int | Bounding rectangle min easting (OSGB metres) |
+| `bbox_min_n` | int | Bounding rectangle min northing (OSGB metres) |
+| `bbox_max_e` | int | Bounding rectangle max easting (OSGB metres) |
+| `bbox_max_n` | int | Bounding rectangle max northing (OSGB metres) |
+
+**Load:**
+```bash
+python ons_msoa_boundaries/ons_msoa_boundaries_load.py
+```
+
+**When to re-run:** MSOA boundaries are updated after each Census (next ~2031).
+
+---
+
+### 6. ONS Postcode to MSOA Lookup (`ons_postcode_lookup/`)
+
+Best-fit lookup from every postcode in England and Wales to MSOA, LAD, CTYUA, region
+and country. ~2.35 million postcodes. The key join table for linking postcode-keyed data
+(house prices, VOA, Code Point Open) to MSOA-level income estimates and boundaries.
+Partitioned by postcode area.
+
+**Source:** ONS Open Geography Portal — `Postcode_to_OA_(2021)_to_LSOA_to_MSOA_to_LAD_to_CTYUA_to_RGN_to_CTRY_Best_Fit_Lookup_in_EW`
+
+**S3 path:** `s3://dantelore.data.incoming/ons_postcode_lookup/lookup/postcode_area={area}/`
+
+**Glue table:** `incoming.ons_postcode_lookup_lookup`
+
+| Field | Type | Description |
+|---|---|---|
+| `postcode` | string | Full postcode (e.g. `RG14 5RU`) |
+| `msoa21cd` | string | MSOA 2021 code |
+| `msoa21nm` | string | MSOA 2021 name |
+| `lad22cd` | string | Local Authority District code (2022) |
+| `lad22nm` | string | Local Authority District name |
+| `ctyua22cd` | string | County/Unitary Authority code (2022) |
+| `ctyua22nm` | string | County/Unitary Authority name |
+| `rgn22cd` | string | Region code (2022) |
+| `rgn22nm` | string | Region name |
+| `ctry22cd` | string | Country code |
+| `ctry22nm` | string | Country name |
+| `postcode_area` | string | **Partition key** — leading letters of postcode, lowercase (e.g. `rg`) |
+
+**Load:**
+```bash
+python ons_postcode_lookup/ons_postcode_lookup_load.py
+```
+
+**When to re-run:** Re-run when ONS publish an updated lookup after boundary or postcode changes.
+
+---
+
+### 7. ONS MSOA Income Estimates (`ons_msoa_income/`)
+
+Modelled household income estimates for all 7,264 MSOAs in England and Wales, financial
+year ending 2023. Four income measures: total annual income, net (disposable) annual
+income, and net income before/after housing costs (both equivalised). Each measure
+includes upper/lower confidence limits.
+
+**Source:** ONS Small Area Income Estimates — financial year ending 2023
+
+**S3 path:** `s3://dantelore.data.incoming/ons_msoa_income/income/msoa_income_2023.parquet`
+
+**Glue table:** `incoming.ons_msoa_income_income`
+
+| Field | Type | Description |
+|---|---|---|
+| `msoa21cd` | string | MSOA code (primary key) |
+| `msoa21nm` | string | MSOA name |
+| `lad_code` | string | Local Authority District code |
+| `lad_name` | string | Local Authority District name |
+| `rgn_code` | string | Region code |
+| `rgn_name` | string | Region name |
+| `total_annual_income` | double | Total gross household income (£) |
+| `total_annual_income_upper_ci` | double | Upper confidence limit (£) |
+| `total_annual_income_lower_ci` | double | Lower confidence limit (£) |
+| `total_annual_income_ci` | double | Confidence interval width (£) |
+| `net_annual_income` | double | Disposable net household income (£) |
+| `net_annual_income_upper_ci` | double | Upper confidence limit (£) |
+| `net_annual_income_lower_ci` | double | Lower confidence limit (£) |
+| `net_annual_income_ci` | double | Confidence interval width (£) |
+| `net_income_before_housing` | double | Equivalised net income before housing costs (£) |
+| `net_income_before_housing_upper_ci` | double | Upper confidence limit (£) |
+| `net_income_before_housing_lower_ci` | double | Lower confidence limit (£) |
+| `net_income_before_housing_ci` | double | Confidence interval width (£) |
+| `net_income_after_housing` | double | Equivalised net income after housing costs (£) |
+| `net_income_after_housing_upper_ci` | double | Upper confidence limit (£) |
+| `net_income_after_housing_lower_ci` | double | Lower confidence limit (£) |
+| `net_income_after_housing_ci` | double | Confidence interval width (£) |
+
+**Load:**
+```bash
+python ons_msoa_income/ons_msoa_income_load.py
+```
+
+**When to re-run:** ONS publish updated estimates every 2–3 years. Update `DOWNLOAD_URL`
+in the loader when a new edition is published.
+
+---
+
+### 9. OS Code Point Open (`os_code_point_open/`)
 
 Coordinates and administrative codes for every postcode in Great Britain (~1.8 million postcodes),
 partitioned by postcode area (e.g. `RG`, `SW`). Useful for joining house price or traffic data
@@ -218,7 +340,7 @@ python os_code_point_open/os_code_point_open_load.py
 
 ---
 
-### 6. OS Open UPRN (`os_open_uprn/`)
+### 10. OS Open UPRN (`os_open_uprn/`)
 
 Coordinates for every addressable location in Great Britain, each identified by a
 Unique Property Reference Number (UPRN). ~40 million records.
@@ -248,7 +370,7 @@ python os_open_uprn/os_open_uprn_load.py
 
 ---
 
-### 7. VOA 2026 Compiled Rating List (`voa_rating_list/`)
+### 11. VOA 2026 Compiled Rating List (`voa_rating_list/`)
 
 All non-domestic (commercial) rated properties in England and Wales from the 2026
 Valuation Office Agency compiled rating list. ~2.4 million entries covering shops,
@@ -303,7 +425,7 @@ used here is `0001` (2026 list) — check the download portal for newer epochs a
 
 ---
 
-### 8. ONS Inflation (`ons_inflation/`)
+### 12. ONS Inflation (`ons_inflation/`)
 
 Monthly CPI, CPIH and RPI time series from the ONS MM23 dataset. 934 monthly
 observations from June 1948 (RPI) and January 1988 (CPI/CPIH) to present.
