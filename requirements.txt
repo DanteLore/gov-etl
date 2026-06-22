@@ -3,5 +3,6 @@ openpyxl
 pandas
 pyarrow
 pyproj
+rasterio
 requests
 shapely

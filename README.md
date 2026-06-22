@@ -3,6 +3,27 @@
 ETL pipelines loading UK government datasets into the dantelore S3 data lake
 (`dantelore.data.incoming`), queryable via Athena.
 
+## Conventions
+
+### Spatial partitioning
+
+Point and raster datasets with OSGB36 coordinates use a consistent two-key partition scheme:
+
+| Partition key | Derivation | Range |
+|---|---|---|
+| `grid_e` | `floor(x_coordinate / 100000)` | 0–6 (100km easting tiles) |
+| `grid_n` | `floor(y_coordinate / 100000)` | 0–12 (100km northing tiles) |
+
+This matches the OS National Grid 100km squares (SV → HZ). Coordinate columns are always
+named `x_coordinate` (easting) and `y_coordinate` (northing) in OSGB36 metres (EPSG:27700).
+
+Datasets covering all of Great Britain have up to 91 tile combinations; England-only datasets
+cover a subset. Querying a specific area requires filtering on both `grid_e` and `grid_n` to
+get partition pruning.
+
+Postcode-anchored datasets (house prices, VOA, Code Point Open, postcode lookup) use
+`postcode_area` (e.g. `sw`, `rg`) instead, as their natural join key is the postcode.
+
 ## Datasets
 
 ### 1. DfT AADF Road Traffic Census (`traffic_census/`)
@@ -453,6 +474,73 @@ python ons_inflation/ons_inflation_load.py
 ```
 
 **When to re-run:** ONS publish updated inflation figures monthly (typically around the 3rd Wednesday).
+
+---
+
+### 13. OS Terrain 50 (`os_terrain_50/`)
+
+50m-resolution Digital Terrain Model (DTM) covering all of Great Britain, derived from
+Ordnance Survey's Terrain 50 product. Each point represents the elevation of the SW corner
+of a 50m grid cell in OSGB36 coordinates.
+
+**Source:** OS Data Hub — free, no authentication required
+([OS Terrain 50](https://osdatahub.os.uk/downloads/open/Terrain50))
+
+**Licence:** Open Government Licence (OGL)
+
+**S3 path:** `s3://dantelore.data.incoming/os_terrain_50/terrain50/tile={tile}/`
+
+**Glue table:** `incoming.os_terrain_50_terrain50`
+
+| Field | Type | Description |
+|---|---|---|
+| `x_coordinate` | int | OSGB36 easting of cell SW corner (metres) |
+| `y_coordinate` | int | OSGB36 northing of cell SW corner (metres) |
+| `elevation_m` | float | Elevation above sea level (metres) |
+| `grid_e` | int | **Partition key** — `floor(x_coordinate / 100000)`, 100km easting tile index (0–6) |
+| `grid_n` | int | **Partition key** — `floor(y_coordinate / 100000)`, 100km northing tile index (0–12) |
+
+**Load:**
+```bash
+python os_terrain_50/os_terrain_50_load.py
+```
+
+---
+
+### 14. EA LiDAR 1m Composite DTM (`ea_lidar_1m/`)
+
+1m-resolution bare-earth Digital Terrain Model (DTM) for England from the Environment
+Agency's National LiDAR Programme. Voids are filled. Each point represents the SW corner
+of a 1m grid cell. Data is partitioned by 10km OS grid tile to match OS Terrain 50.
+
+**Source:** Environment Agency ESDAL — free, no authentication required
+([EA LiDAR Composite DTM 1m](https://environment.data.gov.uk/DefraDataDownload/?Mode=survey))
+
+**Licence:** Open Government Licence (OGL)
+
+**Coverage:** England only
+
+**S3 path:** `s3://dantelore.data.incoming/ea_lidar_1m/dtm/tile={tile}/`
+
+**Glue table:** `incoming.ea_lidar_1m_dtm`
+
+| Field | Type | Description |
+|---|---|---|
+| `x_coordinate` | int | OSGB36 easting of cell SW corner (metres) |
+| `y_coordinate` | int | OSGB36 northing of cell SW corner (metres) |
+| `elevation_m` | float | Elevation above sea level (metres, bare earth) |
+| `grid_e` | int | **Partition key** — `floor(x_coordinate / 100000)`, 100km easting tile index (0–6) |
+| `grid_n` | int | **Partition key** — `floor(y_coordinate / 100000)`, 100km northing tile index (0–12) |
+
+**Load all tiles:**
+```bash
+python ea_lidar_1m/ea_lidar_1m_load.py
+```
+
+**Load a single tile (useful for testing):**
+```bash
+python ea_lidar_1m/ea_lidar_1m_load.py --tile TQ38
+```
 
 ---
 
