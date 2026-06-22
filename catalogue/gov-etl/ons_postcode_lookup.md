@@ -53,12 +53,79 @@ to ONS.
 | ctry22cd | string | Yes | | Country code |
 | ctry22nm | string | Yes | | Country name |
 
+## Common queries
+
+### Look up a single postcode
+
+```sql
+SELECT *
+FROM ons_postcode_lookup_lookup
+WHERE postcode_area = 'rg'
+  AND postcode = 'RG14 5RU'
+```
+
+### All postcodes in an MSOA
+
+```sql
+SELECT postcode
+FROM ons_postcode_lookup_lookup
+WHERE postcode_area = 'rg'
+  AND msoa21cd = 'E02003552'
+ORDER BY postcode
+```
+
+### Join house prices to MSOA income
+
+```sql
+SELECT
+    p.postcode, p.price, p.property_type,
+    l.msoa21nm,
+    i.net_annual_income, i.net_income_after_housing
+FROM house_prices_ppd p
+JOIN ons_postcode_lookup_lookup l
+    ON p.postcode = l.postcode
+    AND l.postcode_area = LOWER(REGEXP_EXTRACT(p.postcode, '^([A-Za-z]+)'))
+JOIN ons_msoa_income_income i ON l.msoa21cd = i.msoa21cd
+WHERE p.year = '2023'
+  AND p.town_city = 'NEWBURY'
+ORDER BY i.net_annual_income DESC
+```
+
+### Average house price by MSOA for a county
+
+```sql
+SELECT
+    l.msoa21nm,
+    COUNT(*) AS sales,
+    ROUND(AVG(p.price)) AS avg_price,
+    i.net_annual_income
+FROM house_prices_ppd p
+JOIN ons_postcode_lookup_lookup l
+    ON p.postcode = l.postcode
+    AND l.postcode_area = LOWER(REGEXP_EXTRACT(p.postcode, '^([A-Za-z]+)'))
+JOIN ons_msoa_income_income i ON l.msoa21cd = i.msoa21cd
+WHERE p.year = '2023'
+  AND l.ctyua22nm = 'West Berkshire'
+GROUP BY l.msoa21nm, i.net_annual_income
+ORDER BY avg_price DESC
+```
+
+### Postcode count per MSOA (proxy for density)
+
+```sql
+SELECT msoa21cd, msoa21nm, COUNT(*) AS postcode_count
+FROM ons_postcode_lookup_lookup
+WHERE postcode_area IN ('rg', 'ox')
+GROUP BY msoa21cd, msoa21nm
+ORDER BY postcode_count DESC
+LIMIT 20
+```
+
 ## Source ETL / code
 
 `github.com/dantelore/gov-etl`, `ons_postcode_lookup/ons_postcode_lookup_load.py`.
-One-off script, not scheduled. Fetches all ~2.35M records from the ArcGIS
-FeatureServer in parallel (8 workers, 1000 records per page), then uploads
-partitioned Parquet files.
+Fetches ~2.35M records from the ArcGIS FeatureServer in parallel (20 concurrent workers,
+1,000 records per page). Expect ~5–10 minutes to complete.
 
 ## Freshness & update cadence
 

@@ -40,7 +40,7 @@ to HM Land Registry.
 | Field name | Type | Nullable | Key role | Description |
 |---|---|---|---|---|
 | transaction_id | string | No | Primary | Land Registry transaction unique identifier |
-| price | integer | Yes | | Sale price in GBP |
+| price | bigint | Yes | | Sale price in GBP |
 | date_of_transfer | string | No | | Date of sale, format varies (stored as string from source) |
 | postcode | string | Yes | Joins to `gov-etl/ons_postcode_lookup` | Property postcode |
 | property_type | string | No | | D=Detached, S=Semi-detached, T=Terraced, F=Flat/Maisonette, O=Other |
