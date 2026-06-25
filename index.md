@@ -2,12 +2,46 @@
 
 One line per dataset. For full details, follow the link.
 
-## weather-etl
+## weather-etl / incoming (raw)
 
 | Dataset | Description |
 |---|---|
-| [datapoint_etl](weather-etl/datapoint_etl.md) | Hourly weather observations from UK and global Met Office stations, via the Met Office DataHub API |
-| [ceda_midas](weather-etl/ceda_midas.md) | Historic quality-controlled UK hourly weather observations from the CEDA MIDAS Open archive (202107 snapshot) |
+| [incoming.weather](weather-etl/incoming/weather.md) | Raw hourly Met Office observations as received from the DataHub API, written every hour |
+| [incoming.midas](weather-etl/incoming/midas.md) | Raw historic CEDA MIDAS Open observations (202107 snapshot, one-off load) |
+
+## weather-etl / lake (modelled)
+
+| Dataset | Description |
+|---|---|
+| [lake.weather](weather-etl/lake/weather.md) | Deduplicated, cleaned hourly Met Office observations — the main analysis table, rebuilt nightly |
+| [lake.weather_stations](weather-etl/lake/weather_stations.md) | Metadata for the 137 UK/Ireland Met Office monitoring stations |
+| [lake.weather_monthly_site_summary](weather-etl/lake/weather_monthly_site_summary.md) | Percentile-based monthly temperature summary by station, rebuilt nightly |
+
+## energy-etl
+
+| Dataset | Description |
+|---|---|
+| [carbon_intensity_national](energy-etl/carbon_intensity_national.md) | National UK carbon intensity — forecast, actual and index, half-hourly |
+| [carbon_intensity_regional](energy-etl/carbon_intensity_regional.md) | Per-DNO-region carbon intensity and generation mix, half-hourly |
+| [carbon_intensity_generation](energy-etl/carbon_intensity_generation.md) | National fuel-type generation share (%) per half-hour from the Carbon Intensity API |
+| [elexon_system_prices](energy-etl/elexon_system_prices.md) | Elexon System Buy/Sell Prices and imbalance volume per settlement period |
+| [elexon_market_index](energy-etl/elexon_market_index.md) | Wholesale electricity prices (MID) from N2EX and APX per settlement period |
+| [elexon_fuelhh](energy-etl/elexon_fuelhh.md) | Half-hourly generation by fuel type in MW — the most granular generation mix data |
+| [elexon_bod](energy-etl/elexon_bod.md) | Balancing Mechanism bid and offer prices/levels per BM unit per settlement period |
+| [elexon_boalf](energy-etl/elexon_boalf.md) | Accepted balancing instructions (BOA Level File) per BM unit |
+| [elexon_pn](energy-etl/elexon_pn.md) | Physical Notifications — BM unit planned output profiles before gate closure |
+| [elexon_netbsad](energy-etl/elexon_netbsad.md) | Net Balancing Services Adjustment Data — price adjustments per settlement period |
+| [remit](energy-etl/remit.md) | REMIT outage notifications for UK generation and transmission assets (versioned) |
+| [repd](energy-etl/repd.md) | Renewable Energy Planning Database — all UK renewable/low-carbon projects and their status |
+| [natgas_sap](energy-etl/natgas_sap.md) | National Gas System Average Price (p/kWh) by gas day |
+| [eia_brent_crude](energy-etl/eia_brent_crude.md) | Europe Brent crude oil daily spot price (USD/barrel), weekdays only |
+
+## analytics-etl
+
+| Dataset | Description |
+|---|---|
+| [incoming.webanalytics](analytics-etl/incoming/webanalytics.md) | Raw CloudFront access logs for dantelore.com — one row per HTTP request, tab-delimited, partitioned by year/month/day |
+| [lake.webanalytics](analytics-etl/lake/webanalytics.md) | Enriched web analytics with geolocation, user-agent parsing, bot detection and content flagging — the main analysis table |
 
 ## gov-etl
 
