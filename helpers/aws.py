@@ -7,7 +7,21 @@ from botocore.exceptions import ClientError
 def load_file_to_s3(filename, s3_bucket, s3_key):
     print(f"Uploading data to S3://{s3_bucket}/{s3_key}")
     s3 = boto3.client('s3')
+    abort_stale_multipart_uploads(s3_bucket, s3_key)
     s3.upload_file(filename, s3_bucket, s3_key)
+
+
+def abort_stale_multipart_uploads(s3_bucket, s3_key):
+    """Abort any incomplete multipart uploads left behind by a previous failed attempt at this key.
+
+    A failed/interrupted upload_file() call can leave an incomplete multipart upload on S3
+    that never becomes visible as an object but still incurs storage cost indefinitely.
+    """
+    s3 = boto3.client('s3')
+    response = s3.list_multipart_uploads(Bucket=s3_bucket, Prefix=s3_key)
+    for upload in response.get('Uploads', []):
+        if upload['Key'] == s3_key:
+            s3.abort_multipart_upload(Bucket=s3_bucket, Key=s3_key, UploadId=upload['UploadId'])
 
 
 def load_json_from_s3(s3_bucket, s3_key):

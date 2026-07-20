@@ -22,6 +22,7 @@ import argparse
 import io
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 import numpy as np
@@ -49,9 +50,21 @@ STEP = 10_000
 E_MIN, E_MAX = 0, 700_000
 N_MIN, N_MAX = 0, 700_000
 
+# A full 10km x 10km chunk at 1m resolution is 10,000 x 10,000 pixels. Observed WCS
+# response times for a full chunk are ~150-170s. The WCS endpoint has also been observed
+# to stall indefinitely mid-response (connection stays open, no bytes, no error) — the
+# `requests` timeout does not catch this since it only bounds connect time and gaps
+# between individual reads, not a slow trickle. STALL_TIMEOUT below bounds the gap
+# between successive chunks of received bytes; FETCH_WALL_CLOCK_TIMEOUT bounds the total
+# time for one fetch regardless of how the server behaves.
+STALL_TIMEOUT = 60
+FETCH_WALL_CLOCK_TIMEOUT = 400
+FETCH_RETRIES = 3
+RETRY_BACKOFF_SECONDS = 10
+
 
 def fetch_chunk(min_e: int, min_n: int) -> bytes | None:
-    """Request a 10km x 10km GeoTIFF from the WCS. Returns None if no data."""
+    """Request a 10km x 10km GeoTIFF from the WCS. Returns None if no data. Retries on transient failure."""
     max_e = min_e + STEP
     max_n = min_n + STEP
     # WCS 2.0 uses subset parameters, not BoundingBox
@@ -64,18 +77,43 @@ def fetch_chunk(min_e: int, min_n: int) -> bytes | None:
         ("subset", f"N,urn:ogc:def:crs:EPSG::27700({min_n},{max_n})"),
         ("format", "image/tiff"),
     ]
-    resp = requests.get(WCS_URL, params=params, timeout=120)
-    if resp.status_code == 404:
-        return None
-    resp.raise_for_status()
-    if b"ExceptionReport" in resp.content[:500] or b"<?xml" in resp.content[:20]:
-        print(f"\n  WCS error: {resp.content[:300].decode(errors='replace')}")
-        return None
-    return resp.content
+
+    last_error = None
+    for attempt in range(1, FETCH_RETRIES + 1):
+        try:
+            start = time.monotonic()
+            chunks = []
+            with requests.get(WCS_URL, params=params, timeout=STALL_TIMEOUT, stream=True) as resp:
+                if resp.status_code == 404:
+                    return None
+                resp.raise_for_status()
+                for piece in resp.iter_content(chunk_size=1024 * 1024):
+                    if time.monotonic() - start > FETCH_WALL_CLOCK_TIMEOUT:
+                        raise TimeoutError(
+                            f"fetch exceeded {FETCH_WALL_CLOCK_TIMEOUT}s wall-clock limit"
+                        )
+                    chunks.append(piece)
+            content = b"".join(chunks)
+            if b"ExceptionReport" in content[:500] or b"<?xml" in content[:20]:
+                print(f"\n  WCS error: {content[:300].decode(errors='replace')}")
+                return None
+            return content
+        except (requests.exceptions.RequestException, TimeoutError, OSError) as e:
+            last_error = e
+            if attempt < FETCH_RETRIES:
+                print(f"\n  fetch failed (attempt {attempt}/{FETCH_RETRIES}): {e} — retrying...", end=" ", flush=True)
+                time.sleep(RETRY_BACKOFF_SECONDS)
+
+    raise RuntimeError(f"WCS fetch failed after {FETCH_RETRIES} attempts: {last_error}")
 
 
-def tiff_to_dataframe(tiff_bytes: bytes) -> pd.DataFrame:
-    """Convert a GeoTIFF to a DataFrame of (x_coordinate, y_coordinate, elevation_m)."""
+def tiff_to_dataframe(tiff_bytes: bytes) -> tuple[pd.DataFrame, int]:
+    """Convert a GeoTIFF to a DataFrame of (x_coordinate, y_coordinate, elevation_m).
+
+    Returns the DataFrame plus the total pixel count in the source raster, so callers
+    can detect a truncated/short TIFF (fewer pixels than a full chunk) independently of
+    legitimate nodata voids (which are excluded from the DataFrame but still counted here).
+    """
     with rasterio.open(io.BytesIO(tiff_bytes)) as src:
         data = src.read(1).astype(np.float32)
         nodata = src.nodata
@@ -90,20 +128,35 @@ def tiff_to_dataframe(tiff_bytes: bytes) -> pd.DataFrame:
     elevs = data.ravel()
     mask = (elevs != nodata) & np.isfinite(elevs)
 
-    return pd.DataFrame({
+    df = pd.DataFrame({
         "x_coordinate": xs.ravel()[mask],
         "y_coordinate": ys.ravel()[mask],
         "elevation_m": elevs[mask],
     })
+    return df, nrows * ncols
+
+
+# A full 10km x 10km chunk at 1m resolution is exactly this many pixels.
+EXPECTED_CHUNK_PIXELS = STEP * STEP
 
 
 def process_chunk(min_e: int, min_n: int) -> int:
-    """Fetch, parse, and upload one 10km chunk. Returns row count."""
+    """Fetch, parse, and upload one 10km chunk. Returns row count.
+
+    Raises if the source TIFF has fewer pixels than a full chunk, since that indicates
+    a truncated/short response rather than legitimate nodata voids (voids are already
+    excluded from the row count by tiff_to_dataframe and are not an error).
+    """
     tiff_bytes = fetch_chunk(min_e, min_n)
     if tiff_bytes is None:
         return 0
 
-    df = tiff_to_dataframe(tiff_bytes)
+    df, pixel_count = tiff_to_dataframe(tiff_bytes)
+    if pixel_count != EXPECTED_CHUNK_PIXELS:
+        raise RuntimeError(
+            f"short TIFF for chunk e{min_e}_n{min_n}: got {pixel_count:,} pixels, "
+            f"expected {EXPECTED_CHUNK_PIXELS:,}"
+        )
     if df.empty:
         return 0
 
@@ -131,6 +184,7 @@ def iter_chunks(bbox: tuple[int, int, int, int] | None):
 def load(bbox: tuple[int, int, int, int] | None = None):
     chunks = list(iter_chunks(bbox))
     total_rows = 0
+    failed_chunks = []
     for i, (min_e, min_n) in enumerate(chunks, 1):
         label = f"E{min_e} N{min_n}"
         print(f"[{i}/{len(chunks)}] {label}...", end=" ", flush=True)
@@ -143,8 +197,14 @@ def load(bbox: tuple[int, int, int, int] | None = None):
                 print("no data")
         except Exception as e:
             print(f"ERROR: {e}")
+            failed_chunks.append((min_e, min_n))
 
     print(f"Done. {total_rows:,} total points.")
+    if failed_chunks:
+        print(f"\n{len(failed_chunks)} chunk(s) FAILED and were not loaded:")
+        for min_e, min_n in failed_chunks:
+            print(f"  --bbox {min_e},{min_n},{min_e + STEP},{min_n + STEP}")
+        print("Re-run the loader with one of the bboxes above to retry a failed chunk.")
 
 
 if __name__ == "__main__":
