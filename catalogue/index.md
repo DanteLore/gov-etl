@@ -43,6 +43,12 @@ One line per dataset. For full details, follow the link.
 | [incoming.webanalytics](analytics-etl/incoming/webanalytics.md) | Raw CloudFront access logs for dantelore.com — one row per HTTP request, tab-delimited, partitioned by year/month/day |
 | [lake.webanalytics](analytics-etl/lake/webanalytics.md) | Enriched web analytics with geolocation, user-agent parsing, bot detection and content flagging — the main analysis table |
 
+## rail-etl
+
+| Dataset | Description |
+|---|---|
+| [rtt_services](rail-etl/rtt_services.md) | RTT actual-vs-scheduled times, cancellations and formation for THA/RDG/PAD |
+
 ## gov-etl
 
 | Dataset | Description |
@@ -57,9 +63,10 @@ One line per dataset. For full details, follow the link.
 | [ons_msoa_boundaries](gov-etl/ons_msoa_boundaries.md) | Polygon boundaries for 7,264 MSOAs in England & Wales with Rural-Urban Classification |
 | [ons_msoa_income](gov-etl/ons_msoa_income.md) | Modelled household income estimates by MSOA, financial year ending March 2023 |
 | [ons_inflation](gov-etl/ons_inflation.md) | Monthly CPI, CPIH and RPI inflation series from June 1948 to present |
-| [exchange_rates](gov-etl/exchange_rates.md) | Daily ECB foreign exchange reference rates for ~165 currencies vs EUR, from 1999 to present |
+| [exchange_rates](gov-etl/exchange_rates.md) | Daily ECB foreign exchange reference rates for 46 currencies (32 still active) vs EUR, from 1999 to present |
 | [traffic_census](gov-etl/traffic_census.md) | Annual average daily vehicle flows at ~30k road count points, 2000 to present |
 | [nomis_census_industry](gov-etl/nomis_census_industry.md) | Census 2021 employment by industry sector for all wards in England & Wales |
 | [nomis_census_occupation](gov-etl/nomis_census_occupation.md) | Census 2021 employment by occupation group for all wards in England & Wales |
 | [os_terrain_50](gov-etl/os_terrain_50.md) | 50m-resolution DTM elevation for all of Great Britain (~114M points) |
 | [ea_lidar_1m](gov-etl/ea_lidar_1m.md) | 1m-resolution bare-earth DTM for England — currently loaded for West Berkshire |
+| [world_bank_gdp](gov-etl/world_bank_gdp.md) | World Bank GDP indicators (current, constant 2015, PPP, per capita) for all countries, 1960 onwards |
