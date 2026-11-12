@@ -2,7 +2,7 @@ resource "aws_glue_catalog_table" "street_manager_permit_events" {
   name          = "street_manager_permit_events"
   database_name = "incoming"
   table_type    = "EXTERNAL_TABLE"
-  description   = "DfT Street Manager open data: roadworks permit and works events in West Berkshire (highway authority SWA 340), 2021 onwards"
+  description   = "DfT Street Manager open data: roadworks permit and works events for every highway authority in England, July 2020 onwards"
 
   parameters = {
     "classification"      = "parquet"

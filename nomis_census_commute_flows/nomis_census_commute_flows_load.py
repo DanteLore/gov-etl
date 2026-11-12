@@ -2,8 +2,8 @@
 Load Census 2021 origin-destination flows from home to workplace (ODWP01EW) into S3.
 
 Source: Nomis bulk download odwp01ew.zip. All of England and Wales. One row per home area, workplace area
-and place-of-work category, with the count of usual residents aged 16+ in employment. Loaded at MSOA and
-local authority level, partitioned by geography_level (msoa, ltla). The output area file (1 GB) is left out.
+and place-of-work category, with the count of usual residents aged 16+. Loaded at output area, MSOA and
+local authority level, partitioned by geography_level (oa, msoa, ltla).
 Census 2021 snapshot: load once.
 
 Usage:
@@ -31,7 +31,7 @@ ATHENA_RESULTS_BUCKET = "dantelore.queryresults"
 TABLE = "nomis_census_commute_flows"
 URL = "https://www.nomisweb.co.uk/output/census/2021/odwp01ew.zip"
 
-LEVELS = {"msoa": "ODWP01EW_MSOA.csv", "ltla": "ODWP01EW_LTLA.csv"}
+LEVELS = {"oa": "ODWP01EW_OA.csv", "msoa": "ODWP01EW_MSOA.csv", "ltla": "ODWP01EW_LTLA.csv"}
 COLUMNS = ["home_code", "home_name", "workplace_code", "workplace_name", "place_of_work_code", "place_of_work_name", "count"]
 TYPES = {c: pa.string() for c in COLUMNS} | {"place_of_work_code": pa.int32(), "count": pa.int32()}
 
