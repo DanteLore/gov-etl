@@ -1,9 +1,11 @@
 boto3
 numpy
+odfpy
 openpyxl
 pandas
 pyarrow
 pyproj
+python-calamine
 rasterio
 requests
 shapely
