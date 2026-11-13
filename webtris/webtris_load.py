@@ -128,12 +128,27 @@ def _number(value, kind=int):
     return kind(value) if value not in (None, "") else None
 
 
+def get_with_retry(url, params, attempts=4):
+    """GET, retrying WebTRIS's occasional 5xx errors and dropped connections with a growing pause."""
+    for attempt in range(1, attempts + 1):
+        try:
+            r = requests.get(url, params=params, timeout=300)
+            if r.status_code < 500:
+                return r
+        except (requests.ConnectionError, requests.Timeout):
+            if attempt == attempts:
+                raise
+        if attempt == attempts:
+            r.raise_for_status()
+        time.sleep(30 * attempt)
+
+
 def fetch_monthly(site_ids, year):
     """The Monthly report for a batch of sites and a year: (daily rows, hourly profile rows), or None if no data."""
     end = min(date(year, 12, 31), date.today())
     months, page = [], 1
     while True:
-        r = requests.get(f"{API}/reports/Monthly", timeout=300, params={
+        r = get_with_retry(f"{API}/reports/Monthly", params={
             "sites": ",".join(site_ids), "start_date": f"0101{year}", "end_date": end.strftime("%d%m%Y"),
             "page": page, "page_size": 40000})
         if page == 1 and (r.status_code in (204, 400) or not r.content):
@@ -164,6 +179,27 @@ def fetch_monthly(site_ids, year):
     return daily, hourly
 
 
+def fetch_batch(site_ids, year):
+    """Monthly report results for a batch of sites. Some sites make WebTRIS fail with a 500 for the whole batch,
+    so if the batch keeps failing, fetch its sites one at a time and skip the ones that still fail."""
+    try:
+        result = fetch_monthly(site_ids, year)
+        time.sleep(0.5)
+        return [result] if result else []
+    except requests.HTTPError:
+        print(f"    {year}: batch from site {site_ids[0]} failed, fetching its sites one at a time")
+    results = []
+    for site_id in site_ids:
+        try:
+            result = fetch_monthly([site_id], year)
+            if result:
+                results.append(result)
+        except requests.HTTPError as e:
+            print(f"    {year}: skipped site {site_id} ({e.response.status_code})")
+        time.sleep(0.5)
+    return results
+
+
 def load_national(from_year):
     sites = load_sites()
     site_ids = list(sites.site_id)
@@ -171,9 +207,7 @@ def load_national(from_year):
         # Frames per batch rather than one big list of dicts: a year of hourly profiles is about 30 million rows
         daily, hourly = [], []
         for i in range(0, len(site_ids), SITES_PER_REQUEST):
-            result = fetch_monthly(site_ids[i:i + SITES_PER_REQUEST], year)
-            time.sleep(0.5)
-            if result:
+            for result in fetch_batch(site_ids[i:i + SITES_PER_REQUEST], year):
                 daily.append(pd.DataFrame(result[0]))
                 hourly.append(pd.DataFrame(result[1]))
         if not daily:

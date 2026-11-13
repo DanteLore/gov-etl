@@ -17,6 +17,7 @@ import struct
 import sys
 import zlib
 import tempfile
+import time
 import zipfile
 from datetime import date
 from pathlib import Path
@@ -128,18 +129,32 @@ def write_month(zip_path, out_path):
     return count
 
 
+def download(url, path, attempts=4):
+    """Stream url to path, retrying dropped connections. False if there is no archive."""
+    for attempt in range(1, attempts + 1):
+        try:
+            with requests.get(url, stream=True, timeout=600) as r:
+                if r.status_code == 404:
+                    return False
+                r.raise_for_status()
+                with open(path, "wb") as f:
+                    for chunk in r.iter_content(16 << 20):
+                        f.write(chunk)
+            return True
+        except (requests.ConnectionError, requests.exceptions.ChunkedEncodingError, requests.Timeout):
+            if attempt == attempts:
+                raise
+            print(f"    download failed, retrying ({attempt}/{attempts - 1})")
+            time.sleep(30 * attempt)
+
+
 def load_month(month):
     label = f"{month:%Y-%m}"
     with tempfile.TemporaryDirectory() as tmp:
         zip_path = Path(tmp) / f"{label}.zip"
-        with requests.get(URL.format(year=month.year, month=month.month), stream=True, timeout=600) as r:
-            if r.status_code == 404:
-                print(f"  {label}: no archive")
-                return
-            r.raise_for_status()
-            with open(zip_path, "wb") as f:
-                for chunk in r.iter_content(16 << 20):
-                    f.write(chunk)
+        if not download(URL.format(year=month.year, month=month.month), zip_path):
+            print(f"  {label}: no archive")
+            return
         out = Path(tmp) / f"{TABLE}_{label}.parquet"
         count = write_month(zip_path, out)
         load_file_to_s3(str(out), S3_INCOMING_BUCKET, f"{PREFIX}event_month={label}/{TABLE}_{label}.parquet")
@@ -151,11 +166,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--month", help="YYYY-MM to (re)load")
     parser.add_argument("--reload-all", action="store_true", help="Reload every month, replacing what is there")
+    parser.add_argument("--from-month", help="With --reload-all, YYYY-MM to start from (to resume)")
     args = parser.parse_args()
     if args.month:
         load_month(date.fromisoformat(f"{args.month}-01"))
     elif args.reload_all:
-        for m in months(FIRST_MONTH):
+        start = date.fromisoformat(f"{args.from_month}-01") if args.from_month else FIRST_MONTH
+        for m in months(start):
             load_month(m)
     else:
         done = loaded_months()

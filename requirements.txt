@@ -2,6 +2,7 @@ boto3
 numpy
 odfpy
 openpyxl
+osmium
 pandas
 pyarrow
 pyproj
