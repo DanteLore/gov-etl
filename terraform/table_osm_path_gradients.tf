@@ -2,7 +2,7 @@ resource "aws_glue_catalog_table" "osm_path_gradients" {
   name          = "osm_path_gradients"
   database_name = "incoming"
   table_type    = "EXTERNAL_TABLE"
-  description   = "Gradient of every OpenStreetMap road and path where the EA 1m lidar is loaded: heights, climb, descent, steepest 50 m and 10 m profile"
+  description   = "Gradient of every OpenStreetMap road and path where the EA 1m lidar is loaded: heights, climb, descent, steepest 50 m, quality flag and 10 m profile"
 
   parameters = {
     "classification"      = "parquet"
@@ -76,6 +76,10 @@ resource "aws_glue_catalog_table" "osm_path_gradients" {
     columns {
       name = "is_interpolated"
       type = "boolean"
+    }
+    columns {
+      name = "gradient_check"
+      type = "string"
     }
     columns {
       name = "elevation_profile_m"

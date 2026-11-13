@@ -2,14 +2,17 @@
 Work out the gradient of every OpenStreetMap road and path where the EA 1m lidar is loaded, from
 incoming.osm_paths and incoming.ea_lidar_1m_dtm, and write it to incoming.osm_path_gradients.
 
-For each way: heights every 10 m along it (the median of the 3 x 3 m of lidar around each point, then a running
-median of three points, to smooth out kerbs, banks and the few metres OpenStreetMap lines can be off), then the
+For each way: heights every 10 m along it (the median of the 3 x 3 m of lidar around each point, then a 90 m
+running median along the way, which removes narrow dips and spikes from unmapped bridges, kerbs, banks and the
+few metres OpenStreetMap lines can be off, but leaves steady slopes alone), then the
 start and end heights, the climb and descent in the direction the way is drawn, the steepest uphill and downhill
 over any 50 m (or the whole way, if shorter), and the 10 m height profile. To get
 a route's climb, add up its ways' climb (or descent, for ways it uses backwards).
 
 The lidar is bare earth: bridges are removed, so a way on a bridge would dip to the river or railway below.
-Ways tagged bridge=* or tunnel=* get heights interpolated between their ends instead (is_interpolated).
+Ways tagged bridge=* or tunnel=* get heights interpolated between their ends instead (is_interpolated). What
+can't be fixed is flagged in gradient_check (roads steeper than 20%, anything steeper than 40%, heights below
+sea level, jumps of over 5 m in 10 m on roads).
 
 Partitioned like osm_paths, by the 100 km grid square of each way's first node. Rerun after reloading osm_paths
 or loading more lidar; each grid square's file is replaced.
@@ -43,13 +46,16 @@ PATHS_PREFIX = "osm/paths/"
 TILE = 10_000  # lidar files are 10 km squares
 STEP = 10      # metres between height samples
 WINDOW = 5     # steps in the steepest-gradient window (50 m)
+SMOOTH = 9     # samples in the running median (90 m): removes dips and spikes up to about 40 m wide
+ROADS = {"motorway", "motorway_link", "trunk", "trunk_link", "primary", "primary_link", "secondary", "secondary_link",
+         "tertiary", "tertiary_link", "unclassified", "residential", "living_street", "service", "road"}
 
 SCHEMA = pa.schema([
     ("osm_id", pa.int64()), ("highway", pa.string()), ("name", pa.string()), ("length_m", pa.float64()),
     ("elevation_start_m", pa.float64()), ("elevation_end_m", pa.float64()), ("elevation_min_m", pa.float64()),
     ("elevation_max_m", pa.float64()), ("climb_m", pa.float64()), ("descent_m", pa.float64()),
     ("max_uphill_pct", pa.float64()), ("max_downhill_pct", pa.float64()), ("mean_gradient_pct", pa.float64()),
-    ("is_interpolated", pa.bool_()), ("elevation_profile_m", pa.list_(pa.float64())),
+    ("is_interpolated", pa.bool_()), ("gradient_check", pa.string()), ("elevation_profile_m", pa.list_(pa.float64())),
 ])
 TO_OSGB = Transformer.from_crs("EPSG:4326", "EPSG:27700", always_xy=True)
 s3 = boto3.client("s3")
@@ -122,6 +128,54 @@ def samples(xs, ys):
     return pts, done
 
 
+def smooth(heights):
+    """Remove narrow dips and spikes (unmapped bridges and culverts, banks beside the line) but keep slopes.
+
+    A running median over SMOOTH samples leaves any steadily rising or falling stretch exactly as it is and
+    removes bumps narrower than half the window; near the ends the window shrinks to stay centred. Then the
+    last few samples at each end are walked outwards: one that steps more than 3 m, and more than three times
+    the typical step before it, from the sample inside it (e.g. a way ending at a bridge abutment, where the lidar
+    drops to the road below) is replaced by continuing the trend.
+    """
+    n = len(heights)
+    if n < 3:
+        return heights
+    half = SMOOTH // 2
+    out = heights.copy()
+    for i in range(1, n - 1):
+        width = min(i, n - 1 - i, half)
+        out[i] = np.median(heights[i - width:i + width + 1])
+    for seq in (out, out[::-1]):  # the tail, then the head (a reversed view writes through to out)
+        k = min(half, n - 3)
+        base = seq[max(n - k - 5, 0):n - k]
+        if len(base) < 2:
+            continue
+        steps = np.diff(base)
+        trend, typical = float(np.median(steps)), float(np.median(np.abs(steps)))
+        for j in range(n - k, n):
+            step = abs(seq[j] - seq[j - 1])
+            if step > 3 and step > 3 * max(typical, 0.1):
+                seq[j] = seq[j - 1] + trend
+    return out
+
+
+def check(highway, heights, window):
+    """Why the gradients may be wrong, or None. Kept as a flag rather than corrected: these are usually ground
+    the lidar sees differently from the way (an unmapped bridge, a way drawn on a cutting slope, ground dug out
+    or built up since the survey) and can't be fixed from the lidar alone."""
+    steepest = float(np.max(np.abs(window))) if len(window) else 0.0
+    reasons = []
+    if heights.min() < 0:
+        reasons.append("below sea level")
+    if highway in ROADS and steepest > 20:
+        reasons.append("road steeper than 20%")
+    elif steepest > 40:
+        reasons.append("steeper than 40%")
+    if highway in ROADS and len(heights) > 1 and np.abs(np.diff(heights)).max() > 5:
+        reasons.append("jump of over 5 m in 10 m")
+    return ", ".join(reasons) or None
+
+
 def gradients(row, lidar):
     coords = [tuple(map(float, p.split())) for p in row["geometry_wkt"][11:-1].split(", ")]
     xs, ys = TO_OSGB.transform([c[0] for c in coords], [c[1] for c in coords])
@@ -134,9 +188,7 @@ def gradients(row, lidar):
     dist = np.array([d for _, _, d in pts])
     ok = ~np.isnan(heights)
     heights = np.interp(dist, dist[ok], heights[ok])
-    if len(heights) >= 3:
-        heights = np.concatenate([heights[:1], np.median([heights[:-2], heights[1:-1], heights[2:]], axis=0),
-                                  heights[-1:]])
+    heights = smooth(heights)
     interpolated = bool(row["bridge"] and row["bridge"] != "no") or bool(row["tunnel"] and row["tunnel"] != "no")
     if interpolated and length > 0:
         heights = heights[0] + (heights[-1] - heights[0]) * dist / length
@@ -153,7 +205,8 @@ def gradients(row, lidar):
         "max_uphill_pct": round(max(float(window.max()), 0.0), 2),
         "max_downhill_pct": round(max(float(-window.min()), 0.0), 2),
         "mean_gradient_pct": round((heights[-1] - heights[0]) / length * 100, 2) if length > 0 else 0.0,
-        "is_interpolated": interpolated, "elevation_profile_m": [round(h, 2) for h in heights],
+        "is_interpolated": interpolated, "gradient_check": check(row["highway"], heights, window),
+        "elevation_profile_m": [round(h, 2) for h in heights],
     }
 
 
